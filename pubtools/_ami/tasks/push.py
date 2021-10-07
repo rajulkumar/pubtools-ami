@@ -57,7 +57,8 @@ class AmiPush(AmiTask, RHSMClientService, AWSPublishService):
     def rhsm_products(self):
         """List of products/image groups for all the service providers"""
         if self._rhsm_products is None:
-            self._rhsm_products = self.rhsm_client.rhsm_products().result()
+            response = self.rhsm_client.rhsm_products().result()
+            self._rhsm_products = response.json()
             prod_names = ["%s(%s)" % (p["name"], p["providerShortName"])
                           for p in self._rhsm_products]
             LOG.debug("%s Products(AWS provider) in rhsm: %s",

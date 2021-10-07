@@ -45,8 +45,8 @@ class RHSMClient(object):
 
     @staticmethod
     def _check_http_response(response):
-        # TODO: process response
         response.raise_for_status()
+        return response
 
     @property
     def _session(self):
@@ -55,6 +55,10 @@ class RHSMClient(object):
             for (key, value) in self._session_attrs.items():
                 setattr(self._tls.session, key, value)
         return self._tls.session
+
+    def _on_failure(self, exception):
+        LOG.error("Failed to process request to RHSM with exception %s", exception)
+        raise exception
 
     # TODO: reduce this to _verb
     def _get(self, *args, **kwargs):
@@ -68,24 +72,15 @@ class RHSMClient(object):
                            "/v1/internal/cloud_access_providers/amazon" +
                            "/provider_image_groups")
         LOG.debug("Fetching product from %s", url)
-        def _on_failure(exception):
-            LOG.error("Unable to get RHSM products: %s", exception)
-            raise exception
 
         out = self._executor.submit(self._get, url)
-
-        out = f_map(out, fn=self._check_http_response, error_fn=_on_failure)
+        out = f_map(out, fn=self._check_http_response, error_fn=self._on_failure)
 
         return out
 
-    def create_region(self, image_id, region, aws_provider_name):
+    def create_region(self, region, aws_provider_name):
         url = urljoin(self._url,
                            "v1/internal/cloud_access_providers/amazon/regions")
-
-        def _on_failure(exception):
-            LOG.error("Failed creating region %s for image %s: %s",
-                      region, image_id, exception)
-            raise exception
 
         rhsm_region = {"regionID": region,
                        "providerShortname": aws_provider_name}
@@ -93,7 +88,7 @@ class RHSMClient(object):
         prepped_req = self._session.prepare_request(req)
 
         out = self._executor.submit(self._send, prepped_req)
-        out = f_map(out, error_fn=_on_failure)
+        out = f_map(out, error_fn=self._on_failure)
 
         return out
 
@@ -101,22 +96,12 @@ class RHSMClient(object):
                      version=None, variant=None):
         url = urljoin(self._url, "/v1/internal/cloud_access_providers/amazon/amis")
 
-        def _on_failure(exception):
-            LOG.error("Failed to update image %s with exception %s", image_id, exception)
-        """
-        def _on_response(response):
-            if not response.ok:
-                LOG.warning("Update to RHSM failed for %s with error code %s. " \
-                            "Image might not be present on RHSM for update.",
-                            image_id, response.status_code)
-            return response
-        """
         now = datetime.utcnow().replace(microsecond=0).isoformat()
         rhsm_image = {"amiID": image_id,
                       "arch": arch.lower(),
                       "product": product_name,
-                      "version": version,
-                      "variant": variant,
+                      "version": version or 'none',
+                      "variant": variant or 'none',
                       "description": "Released %s on %s" % (image_name, now),
                       "status": "VISIBLE"
                      }
@@ -124,24 +109,21 @@ class RHSMClient(object):
         prepped_req = self._session.prepare_request(req)
 
         out = self._executor.submit(self._send, prepped_req)
-        #out = f_map(out, fn=_on_response, error_fn=_on_failure)
-        out = f_map(out, error_fn=_on_failure)
+        out = f_map(out, error_fn=self._on_failure)
+
         return out
 
     def create_image(self, image_id, image_name, arch, product_name,
                      region, version=None, variant=None):
-        url = os.path.join(self._url, "/v1/internal/cloud_access_providers/amazon/amis")
-
-        def _on_failure(exception):
-            LOG.error("Failed to update image %s with exception %s", image_id, exception)
+        url = urljoin(self._url, "/v1/internal/cloud_access_providers/amazon/amis")
 
         now = datetime.utcnow().replace(microsecond=0).isoformat()
         rhsm_image = {"amiID": image_id,
                       "region": region,
                       "arch": arch.lower(),
                       "product": product_name,
-                      "version": version,
-                      "variant": variant,
+                      "version": version or 'none',
+                      "variant": variant or 'none',
                       "description": "Released %s on %s" % (image_name, now),
                       "status": "VISIBLE"
                      }
@@ -149,6 +131,6 @@ class RHSMClient(object):
         prepped_req = self._session.prepare_request(req)
 
         out = self._executor.submit(self._send, prepped_req)
-        out = f_map(out, error_fn=_on_failure)
+        out = f_map(out, error_fn=self._on_failure)
 
         return out
