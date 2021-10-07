@@ -2,6 +2,7 @@ import threading
 import os
 import logging
 from datetime import datetime
+from six.moves.urllib.parse import urljoin
 
 import requests
 from more_executors import Executors
@@ -63,10 +64,10 @@ class RHSMClient(object):
         return self._session.send(*args, **kwargs)
 
     def rhsm_products(self):
-        url = os.path.join(self._url,
+        url = urljoin(self._url,
                            "/v1/internal/cloud_access_providers/amazon" +
                            "/provider_image_groups")
-
+        LOG.debug("Fetching product from %s", url)
         def _on_failure(exception):
             LOG.error("Unable to get RHSM products: %s", exception)
             raise exception
@@ -78,7 +79,7 @@ class RHSMClient(object):
         return out
 
     def create_region(self, image_id, region, aws_provider_name):
-        url = os.path.join(self._url,
+        url = urljoin(self._url,
                            "v1/internal/cloud_access_providers/amazon/regions")
 
         def _on_failure(exception):
@@ -98,7 +99,7 @@ class RHSMClient(object):
 
     def update_image(self, image_id, image_name, arch, product_name,
                      version=None, variant=None):
-        url = os.path.join(self._url, "/v1/internal/cloud_access_providers/amazon/amis")
+        url = urljoin(self._url, "/v1/internal/cloud_access_providers/amazon/amis")
 
         def _on_failure(exception):
             LOG.error("Failed to update image %s with exception %s", image_id, exception)

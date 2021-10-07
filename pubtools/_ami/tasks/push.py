@@ -4,10 +4,10 @@ import os
 import time
 
 from more_executors import Executors
-from more_executors.futures import f_map
 from cloudimg.aws import AWSPublishingMetadata
 from pushsource import Source, AmiPushItem
 from pubtools._ami.task import AmiTask
+from pubtools._ami.arguments import SplitAndExtend
 from ..services import RHSMClientService, AWSPublishService
 
 LOG = logging.getLogger("pubtools.ami")
@@ -57,7 +57,7 @@ class AmiPush(AmiTask, RHSMClientService, AWSPublishService):
     def rhsm_products(self):
         """List of products/image groups for all the service providers"""
         if self._rhsm_products is None:
-            self._rhsm_products = self.rhsm_client.rhsm_products()
+            self._rhsm_products = self.rhsm_client.rhsm_products().result()
             prod_names = ["%s(%s)" % (p["name"], p["providerShortName"])
                           for p in self._rhsm_products]
             LOG.debug("%s Products(AWS provider) in rhsm: %s",
@@ -69,7 +69,7 @@ class AmiPush(AmiTask, RHSMClientService, AWSPublishService):
         # The rhsm prodcut should always be the product (short) plus
         # "_HOURLY" for hourly type images.
         image_type = image_type.upper()
-        aws_provider_name = self.args.was_provider_name
+        aws_provider_name = self.args.aws_provider_name
         if image_type == "HOURLY":
             product = product + '_' + image_type
 
@@ -303,7 +303,7 @@ class AmiPush(AmiTask, RHSMClientService, AWSPublishService):
             retry_args["max_sleep"] = self.args.retry_wait
         if self.args.max_retries:
             retry_args["max_attempts"] = self.args.max_retries
-        self._executor = (
+        _executor = (
             Executors.thread_pool(name="pubtools-ami-push", max_workers=self._REQUEST_THREADS)
             .with_retry(**retry_args)
         )
@@ -317,17 +317,17 @@ class AmiPush(AmiTask, RHSMClientService, AWSPublishService):
 
         group = self.parser.add_argument_group("AMI Push arguments")
 
-        group.add_argument("--source", help="source location of the staged AMIs", type=str)
+        group.add_argument("--source", help="source location of the staged AMIs")
         # --source
         # --source-type
-        group.add_argument("--ship", help="publish the AMIs in public domain", action=store_true)
+        group.add_argument("--ship", help="publish the AMIs in public domain", action="store_true")
         # --ship
         group.add_argument("--container-prefix", help="prefix to storage container for upload", default="redhat-cloudimg")
         # --container-prefix
         group.add_argument("--accounts", help="accounts which will have permission to use the image",
                            action=SplitAndExtend, split_on=",", type=str, default="",)
         # --accounts
-        group.add_argument("--allow-public-images", help="images are released for general use", action=store_true)
+        group.add_argument("--allow-public-images", help="images are released for general use", action="store_true")
         # --allow-public-images
         group.add_argument("--aws-provider-name", help="AWS provider e.g. AWS, ACN (AWS China), AGOV (AWS US Gov)", default="AWS")
         # --aws-provider-name
@@ -348,7 +348,8 @@ class AmiPush(AmiTask, RHSMClientService, AWSPublishService):
         executor = Executors.thread_pool(name="pubtools-ami-push",
                                          max_workers=min(len(region_data),
                                                          self._REQUEST_THREADS))
-        executor.submit(self._push_to_region, region_data)
+        out = executor.submit(self._push_to_region, region_data)
+        out.result()
         # update rhsm
         # verify result
         #self.verify_result()
@@ -357,7 +358,7 @@ class AmiPush(AmiTask, RHSMClientService, AWSPublishService):
 
 
 def entry_point(cls=AmiPush):
-    cls.main()
+    cls().main()
 
 def doc_parser():
-    return AmiTask().parser
+    return AmiPush().parser
