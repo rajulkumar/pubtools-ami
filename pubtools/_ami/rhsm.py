@@ -63,7 +63,7 @@ class RHSMClient(object):
         return self._session.send(*args, **kwargs)
 
     def rhsm_products(self):
-        url = os.path.join(self._url, 
+        url = os.path.join(self._url,
                            "/v1/internal/cloud_access_providers/amazon" +
                            "/provider_image_groups")
 
@@ -92,7 +92,7 @@ class RHSMClient(object):
         prepped_req = self._session.prepare_request(req)
 
         out = self._executor.submit(self._send, prepped_req)
-        out = f_map(out, fn=self._check_http_response, error_fn=_on_failure)
+        out = f_map(out, error_fn=_on_failure)
 
         return out
 
@@ -102,14 +102,14 @@ class RHSMClient(object):
 
         def _on_failure(exception):
             LOG.error("Failed to update image %s with exception %s", image_id, exception)
-
+        """
         def _on_response(response):
             if not response.ok:
                 LOG.warning("Update to RHSM failed for %s with error code %s. " \
                             "Image might not be present on RHSM for update.",
                             image_id, response.status_code)
             return response
-
+        """
         now = datetime.utcnow().replace(microsecond=0).isoformat()
         rhsm_image = {"amiID": image_id,
                       "arch": arch.lower(),
@@ -123,8 +123,8 @@ class RHSMClient(object):
         prepped_req = self._session.prepare_request(req)
 
         out = self._executor.submit(self._send, prepped_req)
-        out = f_map(out, fn=_on_response, error_fn=_on_failure)
-
+        #out = f_map(out, fn=_on_response, error_fn=_on_failure)
+        out = f_map(out, error_fn=_on_failure)
         return out
 
     def create_image(self, image_id, image_name, arch, product_name,
@@ -148,6 +148,6 @@ class RHSMClient(object):
         prepped_req = self._session.prepare_request(req)
 
         out = self._executor.submit(self._send, prepped_req)
-        out = f_map(out, fn=self._check_http_response, error_fn=_on_failure)
+        out = f_map(out, error_fn=_on_failure)
 
         return out

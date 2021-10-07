@@ -10,8 +10,7 @@ LOG = logging.getLogger("pubtools.ami")
 class RHSMClientService(Service):
     """ A service providing RHSM client.
 
-    A client will be available only when RHSM url and
-    certificates are provided.
+    A client will be available only when RHSM url is  provided.
     """
 
     def __init__(self, *args, **kwargs):
@@ -43,12 +42,12 @@ class RHSMClientService(Service):
         with self._lock:
             if not self._instance:
                 self._instance = self._get_instance()
-            return self._instance
+        return self._instance
 
     def _get_instance(self):
         rhsm_url = self._service_args.rhsm_url
         if not rhsm_url:
-            raise Exception("RHSM URL not provided")
+            raise Exception("RHSM URL not provided for the RHSM client")
 
         cert = self._service_args.rhsm_cert, self._service_args.rhsm_key
         return RHSMClient(rhsm_url, cert=cert)
