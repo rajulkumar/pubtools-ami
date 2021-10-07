@@ -15,7 +15,7 @@ class RHSMClientService(Service):
 
     def __init__(self, *args, **kwargs):
         self._lock = threading.Lock()
-        self._instance = None
+        self._rhsm_instance = None
         super(RHSMClientService, self).__init__(*args, **kwargs)
 
     def add_service_args(self, parser):
@@ -40,11 +40,11 @@ class RHSMClientService(Service):
         Error will be raised if the URL is not provided in the CLI.
         """
         with self._lock:
-            if not self._instance:
-                self._instance = self._get_instance()
-        return self._instance
+            if not self._rhsm_instance:
+                self._rhsm_instance = self._get_rhsm_instance()
+        return self._rhsm_instance
 
-    def _get_instance(self):
+    def _get_rhsm_instance(self):
         rhsm_url = self._service_args.rhsm_url
         if not rhsm_url:
             raise Exception("RHSM URL not provided for the RHSM client")

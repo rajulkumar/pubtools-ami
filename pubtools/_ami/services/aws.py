@@ -27,18 +27,20 @@ class AWSPublishService(Service):
         group.add_argument("--aws-access-id",
                            help=("The AWS Service ID or Login to access the service " \
                                  "(or set AWS_ACCESS_ID environment variable)"),
+                           default="",
                            type=from_environ("AWS_ACCESS_ID"))
 
         group.add_argument("--aws-secret-key",
                            help=("The AWS Service key to access the service " \
                                  "(or set AWS_SECRET_KEY environment variable)"),
+                           default="",
                            type=from_environ("AWS_SECRET_KEY"))
 
     def aws_service(self, region):
         """An partial instance of AWS Service to publish AMI"""
         with self._lock:
             if not self._instance:
-                self._instance = self._get_instance
+                self._instance = self._get_instance()
         return self._instance(region=region)
 
     def _get_instance(self):

@@ -2,6 +2,7 @@ import logging
 import sys
 import os
 import time
+import attr
 
 from more_executors import Executors
 from cloudimg.aws import AWSPublishingMetadata
@@ -58,7 +59,7 @@ class AmiPush(AmiTask, RHSMClientService, AWSPublishService):
         """List of products/image groups for all the service providers"""
         if self._rhsm_products is None:
             response = self.rhsm_client.rhsm_products().result()
-            self._rhsm_products = response.json()
+            self._rhsm_products = response.json()["body"]
             prod_names = ["%s(%s)" % (p["name"], p["providerShortName"])
                           for p in self._rhsm_products]
             LOG.debug("%s Products(AWS provider) in rhsm: %s",
@@ -223,8 +224,7 @@ class AmiPush(AmiTask, RHSMClientService, AWSPublishService):
         the existing image info. If the image info is not preset, it creates one.
         """
         LOG.info("Creating region %s", push_item.region)
-        out = self.rhsm_client.create_region(image.id,
-                                             push_item.region,
+        out = self.rhsm_client.create_region(push_item.region,
                                              self.args.aws_provider_name)
 
         response = out.result()
@@ -235,8 +235,8 @@ class AmiPush(AmiTask, RHSMClientService, AWSPublishService):
         LOG.info("Registering image %s with rhsm", image.id)
         image_meta = {"image_id": image.id,
                       "image_name": image.name,
-                      "arch": push_item.arch,
-                      "product_name": self.to_rhsm_product(push_item.product,
+                      "arch": push_item.release.arch,
+                      "product_name": self.to_rhsm_product(push_item.release.product,
                                                            push_item.type),
                       "version": push_item.release.version or None,
                       "variant": push_item.release.variant or None,
@@ -249,7 +249,7 @@ class AmiPush(AmiTask, RHSMClientService, AWSPublishService):
                             "Image might not be present on rhsm for update.",
                             image.id, response.status_code)
 
-            LOG.INFO("Attempting to create new image %s in rhsm", image.id)
+            LOG.info("Attempting to create new image %s in rhsm", image.id)
             image_meta.update({"region": push_item.region})
             out = self.rhsm_client.create_image(**image_meta)
             response = out.result()
@@ -292,11 +292,11 @@ class AmiPush(AmiTask, RHSMClientService, AWSPublishService):
                               (max_retries + 1))
                     state = "NOTPUSHED"
                 break
-            push_item.state = state
+            attr.evolve(push_item, state=state)
             dest_data["state"] = state
             dest_data['image_id'] = image_id
             dest_data['image_name'] = image_name
-
+        return region_data
 
     def _initialize_executor(self):
         retry_args = {}
@@ -349,11 +349,20 @@ class AmiPush(AmiTask, RHSMClientService, AWSPublishService):
         executor = Executors.thread_pool(name="pubtools-ami-push",
                                          max_workers=min(len(region_data),
                                                          self._REQUEST_THREADS))
-        out = executor.submit(self._push_to_region, region_data)
-        out.result()
+        to_await = []
+        result = []
+        for data in region_data:
+            to_await.append(executor.submit(self._push_to_region, data))
+        for f_out in to_await:
+            result.extend(f_out.result())
+        
+        #self._push_to_region(region_data[0])
         # update rhsm
         # verify result
         #self.verify_result()
+        LOG.info("printing itemss")
+        for data in result:
+            LOG.info(data)
         self.collect_push_status(region_data)
 
 

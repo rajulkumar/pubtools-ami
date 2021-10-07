@@ -4,7 +4,6 @@ from argparse import ArgumentParser, RawDescriptionHelpFormatter
 
 from .step import StepDecorator
 
-
 LOG = logging.getLogger("pubtools.ami")
 LOG_FORMAT = "%(asctime)s [%(levelname)-8s] %(message)s"
 
@@ -106,10 +105,10 @@ class AmiTask(object):
         debug_loggers = []
         if self.args.debug >= 1:
             # debug level 1: enable DEBUG from this project
-            debug_loggers.append("pubtools.pulp")
+            debug_loggers.append("pubtools.ami")
         if self.args.debug >= 2:
             # debug level 2: enable DEBUG from closely related projects.
-            debug_loggers.extend(["pubtools", "fastpurge"])
+            debug_loggers.extend(["pubtools", "pushsource", "cloudimg"])
         if self.args.debug >= 3:
             # debug level 3: enable DEBUG from root logger
             # (potentially very, very verbose!)
