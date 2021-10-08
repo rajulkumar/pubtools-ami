@@ -298,17 +298,6 @@ class AmiPush(AmiTask, RHSMClientService, AWSPublishService):
             dest_data['image_name'] = image_name
         return region_data
 
-    def _initialize_executor(self):
-        retry_args = {}
-        if self.args.retry_wait:
-            retry_args["max_sleep"] = self.args.retry_wait
-        if self.args.max_retries:
-            retry_args["max_attempts"] = self.args.max_retries
-        _executor = (
-            Executors.thread_pool(name="pubtools-ami-push", max_workers=self._REQUEST_THREADS)
-            .with_retry(**retry_args)
-        )
-
     def collect_push_status(self, push_items):
         print "Data collected"
         pass

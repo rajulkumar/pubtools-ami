@@ -2,61 +2,57 @@ import os
 import re
 import shutil
 import pytest
-import logging
 import json
 from mock import patch, MagicMock
 from pubtools._ami.tasks.push import AmiPush, entry_point
 
+AMI_STAGE_ROOT = "/tmp/aws_staged"
 
-@pytest.fixture()
+@pytest.fixture(scope="session", autouse=True)
 def stage_ami():
-    path = "/tmp/aws_staged/region-1-hourly/AWS_IMAGES"
-    if os.path.exists("/tmp/aws_staged"):
-        shutil.rmtree("/tmp/aws_staged")
-    os.makedirs("/tmp/aws_staged/region-1-hourly/AWS_IMAGES", mode=0755)
-    open(os.path.join(path,"ami-1.raw"), 'a').close()
+    if os.path.exists(AMI_STAGE_ROOT):
+        shutil.rmtree(AMI_STAGE_ROOT)
+    ami_dest = os.path.join(AMI_STAGE_ROOT, "region-1-hourly/AWS_IMAGES")
+    os.makedirs(ami_dest, mode=0755)
+    open(os.path.join(ami_dest, "ami-1.raw"), 'a').close()
 
     j_file = os.path.join(os.path.dirname(__file__), "data/aws_staged/pub-mapfile.json")
     with open(j_file, 'r') as in_file:
-        with open("/tmp/aws_staged/pub-mapfile.json", 'w') as out_file:
+        with open(os.path.join(AMI_STAGE_ROOT, "pub-mapfile.json"), 'w') as out_file:
             data = json.load(in_file)
             json.dump(data, out_file)
     yield
 
-    if os.path.exists("/tmp/aws_staged"):
-        shutil.rmtree("/tmp/aws_staged")
+    if os.path.exists(AMI_STAGE_ROOT):
+        shutil.rmtree(AMI_STAGE_ROOT)
 
 
 @pytest.fixture(autouse=True)
 def mock_aws_publish():
     with patch("pubtools._ami.services.aws.AWSService.publish") as m:
+        publish_rv = MagicMock(id='ami-1234567')
+        publish_rv.name = "ami-rhel"
+        m.return_value = publish_rv
         yield m
 
-"""
-class FakeAmiPush(AmiPush):
-    def __init__(self, *args, **kwargs):
-        super(FakeAmiPush, self).__init__(*args, **kwargs)
-"""     
-
-
-def test_do_push(command_tester, requests_mocker, mock_aws_publish, stage_ami):
+@pytest.fixture(autouse=True)
+def mock_rhsm_api(requests_mocker):
     requests_mocker.register_uri('GET', re.compile("amazon/provider_image_groups"),
     json={"body":[{"name": "RHEL_HOURLY", "providerShortName": "awstest"},]})
     requests_mocker.register_uri('POST', re.compile("amazon/region"))
-    requests_mocker.register_uri('PUT', re.compile("amazon/amis"), status_code=500)
+    requests_mocker.register_uri('PUT', re.compile("amazon/amis"))
     requests_mocker.register_uri('POST', re.compile("amazon/amis"))
-    publish_rv = MagicMock(id='ami-1234567')
-    publish_rv.name = "ami-rhel"
-    mock_aws_publish.return_value = publish_rv
-    #aws_staged = os.path.join(os.path.dirname(__file__), "data/aws_staged")
-    aws_staged = "/tmp/aws_staged"
+
+
+def test_do_push(command_tester, requests_mocker, mock_aws_publish):
+    requests_mocker.register_uri('PUT', re.compile("amazon/amis"), status_code=500)
 
     command_tester.test(
         lambda: entry_point(AmiPush),
         [
             "test-push",
             "--source",
-            aws_staged,
+            AMI_STAGE_ROOT,
             "--rhsm-url",
             "https://example.com",
             "--aws-provider-name",
