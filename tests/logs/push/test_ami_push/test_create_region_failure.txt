@@ -1,0 +1,37 @@
+[    INFO] Checking files in: /tmp/aws_staged
+[   DEBUG] Verifying push item: AmiPushItem(name='ami-1.raw', state='PENDING', src='/tmp/aws_staged/region-1-hourly/AWS_IMAGES/ami-1.raw', dest=['region-1-hourly'], md5sum=None, sha256sum=None, origin='/tmp/aws_staged', build=None, build_info=None, signing_key=None, release=AmiRelease(product=u'RHEL', date=datetime.date(2021, 9, 2), arch=u'x86_64', respin=5, version=u'8.5.0', base_product=u'RHEL', base_version=u'8.5', variant=u'BaseOS', type=u'beta'), type=u'hourly', region=u'region-1', virtualization=u'hvm', volume=u'gp2', root_device=u'/dev/sda1', description=u'Provided by Red Hat, Inc.', sriov_net_support=u'simple', ena_support=True, billing_codes=AmiBillingCodes(name=u'Hourly2', codes=[u'code-0001']))
+[   DEBUG] Searching for product RHEL_HOURLY in rhsm
+[   DEBUG] Fetching product from https://example.com/v1/internal/cloud_access_providers/amazon/provider_image_groups
+[   DEBUG] 1 Products(AWS provider) in rhsm: RHEL_HOURLY(awstest)
+[    INFO] Uploading /tmp/aws_staged/region-1-hourly/AWS_IMAGES/ami-1.raw to region region-1 (type: hourly, ship: True)
+[    INFO] Image name: RHEL-8.5-RHEL-8.5.0_HVM_BETA-20210902-x86_64-5-Hourly2-GP2
+[    INFO] Creating region region-1
+[   ERROR] Failed creating region region-1 for image ami-1234567
+[ WARNING] 500 Server Error: None for url: https://example.com/v1/internal/cloud_access_providers/amazon/regions
+[    INFO] Retrying upload
+[    INFO] Uploading /tmp/aws_staged/region-1-hourly/AWS_IMAGES/ami-1.raw to region region-1 (type: hourly, ship: True)
+[    INFO] Image name: RHEL-8.5-RHEL-8.5.0_HVM_BETA-20210902-x86_64-5-Hourly2-GP2
+[    INFO] Creating region region-1
+[   ERROR] Failed creating region region-1 for image ami-1234567
+[ WARNING] 500 Server Error: None for url: https://example.com/v1/internal/cloud_access_providers/amazon/regions
+[    INFO] Retrying upload
+[    INFO] Uploading /tmp/aws_staged/region-1-hourly/AWS_IMAGES/ami-1.raw to region region-1 (type: hourly, ship: True)
+[    INFO] Image name: RHEL-8.5-RHEL-8.5.0_HVM_BETA-20210902-x86_64-5-Hourly2-GP2
+[    INFO] Creating region region-1
+[   ERROR] Failed creating region region-1 for image ami-1234567
+[ WARNING] 500 Server Error: None for url: https://example.com/v1/internal/cloud_access_providers/amazon/regions
+[    INFO] Retrying upload
+[    INFO] Uploading /tmp/aws_staged/region-1-hourly/AWS_IMAGES/ami-1.raw to region region-1 (type: hourly, ship: True)
+[    INFO] Image name: RHEL-8.5-RHEL-8.5.0_HVM_BETA-20210902-x86_64-5-Hourly2-GP2
+[    INFO] Creating region region-1
+[   ERROR] Failed creating region region-1 for image ami-1234567
+[ WARNING] 500 Server Error: None for url: https://example.com/v1/internal/cloud_access_providers/amazon/regions
+[    INFO] Retrying upload
+[    INFO] Uploading /tmp/aws_staged/region-1-hourly/AWS_IMAGES/ami-1.raw to region region-1 (type: hourly, ship: True)
+[    INFO] Image name: RHEL-8.5-RHEL-8.5.0_HVM_BETA-20210902-x86_64-5-Hourly2-GP2
+[    INFO] Creating region region-1
+[   ERROR] Failed creating region region-1 for image ami-1234567
+[ WARNING] 500 Server Error: None for url: https://example.com/v1/internal/cloud_access_providers/amazon/regions
+[   ERROR] Upload failed after 5 attempts. Giving up
+[    INFO] Collecting results
+[    INFO] AMI upload completed

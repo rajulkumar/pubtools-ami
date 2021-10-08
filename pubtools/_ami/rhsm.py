@@ -2,7 +2,7 @@ import threading
 import os
 import logging
 from datetime import datetime
-from six.moves import urljoin
+from six.moves.urllib.parse import urljoin
 
 import requests
 from more_executors import Executors
@@ -39,7 +39,7 @@ class RHSMClient(object):
         self._session_attrs = kwargs
         self._executor = (
             Executors.thread_pool(name="rhsm-client", max_workers=self._REQUEST_THREADS)
-            #.with_map(self._check_http_response)
+            # .with_map(self._check_http_response)
             .with_retry(**retry_args)
         )
 
@@ -68,9 +68,10 @@ class RHSMClient(object):
         return self._session.send(*args, **kwargs)
 
     def rhsm_products(self):
-        url = urljoin(self._url,
-                           "/v1/internal/cloud_access_providers/amazon" +
-                           "/provider_image_groups")
+        url = urljoin(
+            self._url,
+            "/v1/internal/cloud_access_providers/amazon" + "/provider_image_groups",
+        )
         LOG.debug("Fetching product from %s", url)
 
         out = self._executor.submit(self._get, url)
@@ -79,11 +80,9 @@ class RHSMClient(object):
         return out
 
     def create_region(self, region, aws_provider_name):
-        url = urljoin(self._url,
-                           "v1/internal/cloud_access_providers/amazon/regions")
+        url = urljoin(self._url, "v1/internal/cloud_access_providers/amazon/regions")
 
-        rhsm_region = {"regionID": region,
-                       "providerShortname": aws_provider_name}
+        rhsm_region = {"regionID": region, "providerShortname": aws_provider_name}
         req = requests.Request("POST", url, json=rhsm_region)
         prepped_req = self._session.prepare_request(req)
 
@@ -92,19 +91,21 @@ class RHSMClient(object):
 
         return out
 
-    def update_image(self, image_id, image_name, arch, product_name,
-                     version=None, variant=None):
+    def update_image(
+        self, image_id, image_name, arch, product_name, version=None, variant=None
+    ):
         url = urljoin(self._url, "/v1/internal/cloud_access_providers/amazon/amis")
 
         now = datetime.utcnow().replace(microsecond=0).isoformat()
-        rhsm_image = {"amiID": image_id,
-                      "arch": arch.lower(),
-                      "product": product_name,
-                      "version": version or 'none',
-                      "variant": variant or 'none',
-                      "description": "Released %s on %s" % (image_name, now),
-                      "status": "VISIBLE"
-                     }
+        rhsm_image = {
+            "amiID": image_id,
+            "arch": arch.lower(),
+            "product": product_name,
+            "version": version or "none",
+            "variant": variant or "none",
+            "description": "Released %s on %s" % (image_name, now),
+            "status": "VISIBLE",
+        }
         req = requests.Request("PUT", url, json=rhsm_image)
         prepped_req = self._session.prepare_request(req)
 
@@ -113,20 +114,29 @@ class RHSMClient(object):
 
         return out
 
-    def create_image(self, image_id, image_name, arch, product_name,
-                     region, version=None, variant=None):
+    def create_image(
+        self,
+        image_id,
+        image_name,
+        arch,
+        product_name,
+        region,
+        version=None,
+        variant=None,
+    ):
         url = urljoin(self._url, "/v1/internal/cloud_access_providers/amazon/amis")
 
         now = datetime.utcnow().replace(microsecond=0).isoformat()
-        rhsm_image = {"amiID": image_id,
-                      "region": region,
-                      "arch": arch.lower(),
-                      "product": product_name,
-                      "version": version or 'none',
-                      "variant": variant or 'none',
-                      "description": "Released %s on %s" % (image_name, now),
-                      "status": "VISIBLE"
-                     }
+        rhsm_image = {
+            "amiID": image_id,
+            "region": region,
+            "arch": arch.lower(),
+            "product": product_name,
+            "version": version or "none",
+            "variant": variant or "none",
+            "description": "Released %s on %s" % (image_name, now),
+            "status": "VISIBLE",
+        }
         req = requests.Request("POST", url, json=rhsm_image)
         prepped_req = self._session.prepare_request(req)
 

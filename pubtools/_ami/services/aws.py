@@ -14,6 +14,7 @@ class AWSPublishService(Service):
     The service client is returned when the access-id and
     secret-key is provided.
     """
+
     def __init__(self, *args, **kwargs):
         self._instance = None
         self._lock = threading.Lock()
@@ -24,17 +25,25 @@ class AWSPublishService(Service):
 
         group = parser.add_argument_group("AWS Service arguments")
 
-        group.add_argument("--aws-access-id",
-                           help=("The AWS Service ID or Login to access the service " \
-                                 "(or set AWS_ACCESS_ID environment variable)"),
-                           default="",
-                           type=from_environ("AWS_ACCESS_ID"))
+        group.add_argument(
+            "--aws-access-id",
+            help=(
+                "The AWS Service ID or Login to access the service "
+                "(or set AWS_ACCESS_ID environment variable)"
+            ),
+            default="",
+            type=from_environ("AWS_ACCESS_ID"),
+        )
 
-        group.add_argument("--aws-secret-key",
-                           help=("The AWS Service key to access the service " \
-                                 "(or set AWS_SECRET_KEY environment variable)"),
-                           default="",
-                           type=from_environ("AWS_SECRET_KEY"))
+        group.add_argument(
+            "--aws-secret-key",
+            help=(
+                "The AWS Service key to access the service "
+                "(or set AWS_SECRET_KEY environment variable)"
+            ),
+            default="",
+            type=from_environ("AWS_SECRET_KEY"),
+        )
 
     def aws_service(self, region):
         """An partial instance of AWS Service to publish AMI"""
@@ -50,4 +59,3 @@ class AWSPublishService(Service):
             raise Exception("Access ID or Secret Key not provided to use AWS Service")
 
         return partial(AWSService, access_id, secret_key)
-    

@@ -2,24 +2,27 @@ import logging
 import sys
 import os
 import time
+import datetime
 import attr
+import json
 
 from more_executors import Executors
 from cloudimg.aws import AWSPublishingMetadata
 from pushsource import Source, AmiPushItem
 from pubtools._ami.task import AmiTask
 from pubtools._ami.arguments import SplitAndExtend
-from ..services import RHSMClientService, AWSPublishService
+from ..services import RHSMClientService, AWSPublishService, CollectorService
 
 LOG = logging.getLogger("pubtools.ami")
 
 
 class MissingProductError(Exception):
     """Exception class for products missing in the metadata service"""
+
     pass
 
 
-class AmiPush(AmiTask, RHSMClientService, AWSPublishService):
+class AmiPush(AmiTask, RHSMClientService, AWSPublishService, CollectorService):
 
     _REQUEST_THREADS = int(os.environ.get("AMI_PUSH_REQUEST_THREADS", "5"))
 
@@ -42,14 +45,19 @@ class AmiPush(AmiTask, RHSMClientService, AWSPublishService):
         ami_push_items = []
         source_loc = self.args.source
         if not source_loc:
-            self.fail("Source not available to fetch push items." \
-                      "Use --source to provide the location")
+            self.fail(
+                "Source not available to fetch push items. "
+                "Use --source to provide the location of the AMIs."
+            )
         with Source.get("staged:", url=source_loc) as source:
             for push_item in source:
                 if not isinstance(push_item, AmiPushItem):
-                    LOG.warning("Push Item %s at %s is not an AmiPushItem. " \
-                                "Dropping it from the queue",
-                                 push_item.name, push_item.src)
+                    LOG.warning(
+                        "Push Item %s at %s is not an AmiPushItem. "
+                        "Dropping it from the queue",
+                        push_item.name,
+                        push_item.src,
+                    )
                     continue
                 ami_push_items.append(push_item)
         return ami_push_items
@@ -60,10 +68,15 @@ class AmiPush(AmiTask, RHSMClientService, AWSPublishService):
         if self._rhsm_products is None:
             response = self.rhsm_client.rhsm_products().result()
             self._rhsm_products = response.json()["body"]
-            prod_names = ["%s(%s)" % (p["name"], p["providerShortName"])
-                          for p in self._rhsm_products]
-            LOG.debug("%s Products(AWS provider) in rhsm: %s",
-                           len(prod_names), ', '.join(sorted(prod_names)))
+            prod_names = [
+                "%s(%s)" % (p["name"], p["providerShortName"])
+                for p in self._rhsm_products
+            ]
+            LOG.debug(
+                "%s Products(AWS provider) in rhsm: %s",
+                len(prod_names),
+                ", ".join(sorted(prod_names)),
+            )
         return self._rhsm_products
 
     def to_rhsm_product(self, product, image_type):
@@ -73,12 +86,14 @@ class AmiPush(AmiTask, RHSMClientService, AWSPublishService):
         image_type = image_type.upper()
         aws_provider_name = self.args.aws_provider_name
         if image_type == "HOURLY":
-            product = product + '_' + image_type
+            product = product + "_" + image_type
 
         LOG.debug("Searching for product %s in rhsm", product)
         for rhsm_product in self.rhsm_products:
-            if rhsm_product["name"] == product and \
-               rhsm_product["providerShortName"] == aws_provider_name:
+            if (
+                rhsm_product["name"] == product
+                and rhsm_product["providerShortName"] == aws_provider_name
+            ):
                 return rhsm_product
 
         raise MissingProductError("Product not in rhsm: %s" % product)
@@ -96,13 +111,20 @@ class AmiPush(AmiTask, RHSMClientService, AWSPublishService):
         return True
 
     def items_in_metadata_service(self):
+        """ Checks for all the push_items whether they are in
+        rhsm or not.
+        Returns false if any of item is missing else true.
+        """
         verified = True
         for item in self.ami_push_items:
             LOG.debug("Verifying push item: %s", item)
             if not self.in_rhsm(item.release.product, item.type):
-                LOG.error("Pre-push check in metadata service failed for %s at %s",
-                          item.name, item.src)
-                item.state = "INVALIDFILE"
+                LOG.error(
+                    "Pre-push check in metadata service failed for %s at %s",
+                    item.name,
+                    item.src,
+                )
+                attr.evolve(item, state="INVALIDFILE")
                 verified = False
         return verified
 
@@ -131,7 +153,7 @@ class AmiPush(AmiTask, RHSMClientService, AWSPublishService):
         if release.type is not None:
             underscore_parts.append(release.type.upper())
 
-        parts.append('_'.join(underscore_parts))
+        parts.append("_".join(underscore_parts))
 
         parts.append(release.date.strftime("%Y%m%d"))
         parts.append(release.arch)
@@ -139,7 +161,7 @@ class AmiPush(AmiTask, RHSMClientService, AWSPublishService):
         parts.append(push_item.billing_codes.name)
         parts.append(push_item.volume.upper())
 
-        return '-'.join(parts)
+        return "-".join(parts)
 
     def upload(self, push_item):
         """
@@ -168,18 +190,18 @@ class AmiPush(AmiTask, RHSMClientService, AWSPublishService):
         image_type = push_item.type
         file_path = push_item.src
         ship = self.args.ship
-        LOG.info("Uploading %s to region %s (type: %s, ship: %s)",
-                 file_path, region, image_type, ship)
+        LOG.info(
+            "Uploading %s to region %s (type: %s, ship: %s)",
+            file_path,
+            region,
+            image_type,
+            ship,
+        )
 
         name = self.name_from_metadata(push_item)
-        #metadata['name'] = name
         LOG.info("Image name: %s", name)
 
-        container = '%s-%s' % (self.args.container_prefix, region)
-
-        #if region in self.accounts:
-        #    accounts = list(self._accounts[region].values())
-        #else:
+        container = "%s-%s" % (self.args.container_prefix, region)
         accounts = self.args.accounts
 
         publish_meta = AWSPublishingMetadata(
@@ -195,7 +217,7 @@ class AmiPush(AmiTask, RHSMClientService, AWSPublishService):
             billing_products=push_item.billing_codes.codes,
             accounts=accounts,
             sriov_net_support=push_item.sriov_net_support,
-            ena_support=push_item.ena_support or False
+            ena_support=push_item.ena_support or False,
         )
 
         aws = self.aws_service(region)
@@ -210,7 +232,7 @@ class AmiPush(AmiTask, RHSMClientService, AWSPublishService):
                 # should only be done for hourly images since they are the only
                 # type to charge an additional Red Hat fee.
                 # http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/sharingamis-intro.html
-                publish_meta.groups = ['all']
+                publish_meta.groups = ["all"]
                 # A repeat call to publish will only update the groups
                 aws.publish(publish_meta)
 
@@ -224,43 +246,57 @@ class AmiPush(AmiTask, RHSMClientService, AWSPublishService):
         the existing image info. If the image info is not preset, it creates one.
         """
         LOG.info("Creating region %s", push_item.region)
-        out = self.rhsm_client.create_region(push_item.region,
-                                             self.args.aws_provider_name)
+        out = self.rhsm_client.create_region(
+            push_item.region, self.args.aws_provider_name
+        )
 
         response = out.result()
         if not response.ok:
-            LOG.error("Failed creating region %s for image %s", push_item.region, image.id)
+            LOG.error(
+                "Failed creating region %s for image %s", push_item.region, image.id
+            )
             response.raise_for_status()
 
         LOG.info("Registering image %s with rhsm", image.id)
-        image_meta = {"image_id": image.id,
-                      "image_name": image.name,
-                      "arch": push_item.release.arch,
-                      "product_name": self.to_rhsm_product(push_item.release.product,
-                                                           push_item.type),
-                      "version": push_item.release.version or None,
-                      "variant": push_item.release.variant or None,
+        image_meta = {
+            "image_id": image.id,
+            "image_name": image.name,
+            "arch": push_item.release.arch,
+            "product_name": self.to_rhsm_product(
+                push_item.release.product, push_item.type
+            ),
+            "version": push_item.release.version or None,
+            "variant": push_item.release.variant or None,
         }
         LOG.info("Attempting to update the existing image %s in rhsm", image.id)
         out = self.rhsm_client.update_image(**image_meta)
         response = out.result()
         if not response.ok:
-            LOG.warning("Update to rhsm failed for %s with error code %s. " \
-                            "Image might not be present on rhsm for update.",
-                            image.id, response.status_code)
+            LOG.warning(
+                "Update to rhsm failed for %s with error code %s. "
+                "Image might not be present on rhsm for update.",
+                image.id,
+                response.status_code,
+            )
 
             LOG.info("Attempting to create new image %s in rhsm", image.id)
             image_meta.update({"region": push_item.region})
             out = self.rhsm_client.create_image(**image_meta)
             response = out.result()
             if not response.ok:
-                LOG.error("Failed to create image %s in rhsm with error code %s",
-                          image.id, response.status_code)
+                LOG.error(
+                    "Failed to create image %s in rhsm with error code %s",
+                    image.id,
+                    response.status_code,
+                )
                 LOG.error(response.text)
                 response.raise_for_status()
         LOG.info("Successfully registered image %s with rhsm", image.id)
 
     def region_data(self):
+        """ Aggregate push_items for each item and region
+        for various destinations
+        """
         region_data = {}
         for item in self.ami_push_items:
             for dest in item.dest:
@@ -269,6 +305,8 @@ class AmiPush(AmiTask, RHSMClientService, AWSPublishService):
         return region_data.values()
 
     def _push_to_region(self, region_data):
+        # sends the push_items for each region to be uploaded in
+        # a single thread
         retry_wait = self.args.retry_wait or 30
         max_retries = self.args.max_retries or 4
 
@@ -288,19 +326,29 @@ class AmiPush(AmiTask, RHSMClientService, AWSPublishService):
                         LOG.info("Retrying upload")
                         time.sleep(retry_wait)
                         continue
-                    LOG.error("Upload failed after %s attempts. Giving up",
-                              (max_retries + 1))
+                    LOG.error(
+                        "Upload failed after %s attempts. Giving up", (max_retries + 1)
+                    )
                     state = "NOTPUSHED"
                 break
             attr.evolve(push_item, state=state)
             dest_data["state"] = state
-            dest_data['image_id'] = image_id
-            dest_data['image_name'] = image_name
+            dest_data["image_id"] = image_id
+            dest_data["image_name"] = image_name
         return region_data
 
-    def collect_push_status(self, push_items):
-        print "Data collected"
-        pass
+    def collect_push_result(self, results):
+        """ Collects the push results and sends its json to the collector"""
+
+        def convert(obj):
+            if isinstance(obj, (datetime.datetime, datetime.date)):
+                return obj.strftime("%Y%m%d")
+
+        for result in results:
+            result["push_item"] = attr.asdict(result["push_item"])
+
+        metadata = json.dumps(results, default=convert, indent=2, sort_keys=True)
+        self.collector.attach_file("images.json", metadata).result()
 
     def add_args(self):
         super(AmiPush, self).add_args()
@@ -308,57 +356,83 @@ class AmiPush(AmiTask, RHSMClientService, AWSPublishService):
         group = self.parser.add_argument_group("AMI Push arguments")
 
         group.add_argument("--source", help="source location of the staged AMIs")
-        # --source
-        # --source-type
-        group.add_argument("--ship", help="publish the AMIs in public domain", action="store_true")
-        # --ship
-        group.add_argument("--container-prefix", help="prefix to storage container for upload", default="redhat-cloudimg")
-        # --container-prefix
-        group.add_argument("--accounts", help="accounts which will have permission to use the image",
-                           action=SplitAndExtend, split_on=",", type=str, default="",)
-        # --accounts
-        group.add_argument("--allow-public-images", help="images are released for general use", action="store_true")
-        # --allow-public-images
-        group.add_argument("--aws-provider-name", help="AWS provider e.g. AWS, ACN (AWS China), AGOV (AWS US Gov)", default="AWS")
-        # --aws-provider-name
-        group.add_argument("--retry-wait", help="duration to wait in sec before retrying upload", type=int, default=30)
-        # --retry-wait
-        group.add_argument("--max-retries", help="number of retries on failure to upload", type=int, default=4)
-        # --max-retries
+
+        group.add_argument(
+            "--ship", help="publish the AMIs in public domain", action="store_true"
+        )
+
+        group.add_argument(
+            "--container-prefix",
+            help="prefix to storage container for upload",
+            default="redhat-cloudimg",
+        )
+
+        group.add_argument(
+            "--accounts",
+            help="accounts which will have permission to use the image",
+            action=SplitAndExtend,
+            split_on=",",
+            type=str,
+            default="",
+        )
+
+        group.add_argument(
+            "--allow-public-images",
+            help="images are released for general use",
+            action="store_true",
+        )
+
+        group.add_argument(
+            "--aws-provider-name",
+            help="AWS provider e.g. AWS, ACN (AWS China), AGOV (AWS US Gov)",
+            default="AWS",
+        )
+
+        group.add_argument(
+            "--retry-wait",
+            help="duration to wait in sec before retrying upload",
+            type=int,
+            default=30,
+        )
+
+        group.add_argument(
+            "--max-retries",
+            help="number of retries on failure to upload",
+            type=int,
+            default=4,
+        )
 
     def run(self):
-        # get amiitems from pushsource
-        # verify items
+        # verify push_items
         if not self.items_in_metadata_service():
-            self.collect_push_status(self.ami_push_items)
             self.fail("Pre-push verification of push items in metadata service failed")
-        # split into threads
+
+        # split push_items into regions
         region_data = self.region_data()
+
         # upload
-        executor = Executors.thread_pool(name="pubtools-ami-push",
-                                         max_workers=min(len(region_data),
-                                                         self._REQUEST_THREADS))
+        executor = Executors.thread_pool(
+            name="pubtools-ami-push",
+            max_workers=min(len(region_data), self._REQUEST_THREADS),
+        )
         to_await = []
         result = []
         for data in region_data:
             to_await.append(executor.submit(self._push_to_region, data))
+
+        # waiting for results
         for f_out in to_await:
             result.extend(f_out.result())
-        
-        #self._push_to_region(region_data[0])
-        # update rhsm
-        # verify result
-        #self.verify_result()
-        LOG.info("Collecting results")
-        #for data in result:
-        #    LOG.info(data)
-        self.collect_push_status(region_data)
-        LOG.info("AMI upload completed")
 
+        # send to collector
+        LOG.info("Collecting results")
+        self.collect_push_result(result)
+        LOG.info("AMI upload completed")
 
 
 def entry_point(cls=AmiPush):
     cls().main()
+
 
 def doc_parser():
     return AmiPush().parser

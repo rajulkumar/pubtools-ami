@@ -7,6 +7,7 @@ from .base import Service
 
 LOG = logging.getLogger("pubtools.ami")
 
+
 class RHSMClientService(Service):
     """ A service providing RHSM client.
 
@@ -24,14 +25,19 @@ class RHSMClientService(Service):
         group = parser.add_argument_group("RHSM environment")
 
         group.add_argument("--rhsm-url", help="Base URL of the RHSM API")
-        group.add_argument("--rhsm-cert",
-                            help=("RHSM API certificate path",
-                                  "(or set RHSM_CERT environment variable)"),
-                            type=from_environ("RHSM_CERT"))
-        group.add_argument("--rhsm-key",
-                           help=("RHSM API key path",
-                                 "(or set RHSM_KEY environment variable)"),
-                           type=from_environ("RHSM_KEY"))
+        group.add_argument(
+            "--rhsm-cert",
+            help=(
+                "RHSM API certificate path",
+                "(or set RHSM_CERT environment variable)",
+            ),
+            type=from_environ("RHSM_CERT"),
+        )
+        group.add_argument(
+            "--rhsm-key",
+            help=("RHSM API key path", "(or set RHSM_KEY environment variable)"),
+            type=from_environ("RHSM_KEY"),
+        )
 
     @property
     def rhsm_client(self):
@@ -51,4 +57,3 @@ class RHSMClientService(Service):
 
         cert = self._service_args.rhsm_cert, self._service_args.rhsm_key
         return RHSMClient(rhsm_url, cert=cert)
-    

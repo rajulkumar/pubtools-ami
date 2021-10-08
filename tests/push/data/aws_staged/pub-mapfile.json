@@ -17,8 +17,8 @@
             "region": "region-1", 
             "release": {
               "arch": "x86_64", 
-              "base_product": null, 
-              "base_version": null, 
+              "base_product": "RHEL", 
+              "base_version": "8.5", 
               "date": "20210902", 
               "product": "RHEL", 
               "respin": 5, 
