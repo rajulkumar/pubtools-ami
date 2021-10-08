@@ -111,7 +111,7 @@ class AmiPush(AmiTask, RHSMClientService, AWSPublishService, CollectorService):
         return True
 
     def items_in_metadata_service(self):
-        """ Checks for all the push_items whether they are in
+        """Checks for all the push_items whether they are in
         rhsm or not.
         Returns false if any of item is missing else true.
         """
@@ -294,7 +294,7 @@ class AmiPush(AmiTask, RHSMClientService, AWSPublishService, CollectorService):
         LOG.info("Successfully registered image %s with rhsm", image.id)
 
     def region_data(self):
-        """ Aggregate push_items for each item and region
+        """Aggregate push_items for each item and region
         for various destinations
         """
         region_data = {}
@@ -338,7 +338,7 @@ class AmiPush(AmiTask, RHSMClientService, AWSPublishService, CollectorService):
         return region_data
 
     def collect_push_result(self, results):
-        """ Collects the push results and sends its json to the collector"""
+        """Collects the push results and sends its json to the collector"""
 
         def convert(obj):
             if isinstance(obj, (datetime.datetime, datetime.date)):

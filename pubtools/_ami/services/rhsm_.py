@@ -9,7 +9,7 @@ LOG = logging.getLogger("pubtools.ami")
 
 
 class RHSMClientService(Service):
-    """ A service providing RHSM client.
+    """A service providing RHSM client.
 
     A client will be available only when RHSM url is  provided.
     """
@@ -41,7 +41,7 @@ class RHSMClientService(Service):
 
     @property
     def rhsm_client(self):
-        """ RHSM client used for AMI related info on RHSM.
+        """RHSM client used for AMI related info on RHSM.
 
         Error will be raised if the URL is not provided in the CLI.
         """
