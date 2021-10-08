@@ -56,6 +56,6 @@ class AWSPublishService(Service):
         access_id = self._service_args.aws_access_id
         secret_key = self._service_args.aws_secret_key
         if not (access_id and secret_key):
-            raise Exception("Access ID or Secret Key not provided to use AWS Service")
+            raise Exception("Access ID or Secret Key not provided for AWS Service")
 
         return partial(AWSService, access_id, secret_key)

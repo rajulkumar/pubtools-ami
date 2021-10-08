@@ -32,6 +32,7 @@ class CommandTester(object):
         UPDATE_BASELINES environment variable to 1.
         """
         self._caplog.set_level(logging.INFO)
+        self._caplog.set_level(logging.DEBUG, logger="pubtools.ami")
 
         sys.argv[:] = args
         exception = None

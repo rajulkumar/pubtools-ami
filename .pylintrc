@@ -100,4 +100,9 @@ disable=print-statement,
         super-with-arguments,
         # we use quite a few one or two letter names of functions
         invalid-name,
+        # limiting the number of args in a client
+        too-many-arguments,
+        # from keyword to raise exception was introduced in python3
+        # https://legacy.python.org/dev/peps/pep-3134/
+        raise-missing-from
 

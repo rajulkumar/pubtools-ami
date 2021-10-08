@@ -15,7 +15,7 @@ def stage_ami():
     if os.path.exists(AMI_STAGE_ROOT):
         shutil.rmtree(AMI_STAGE_ROOT)
     ami_dest = os.path.join(AMI_STAGE_ROOT, "region-1-hourly/AWS_IMAGES")
-    os.makedirs(ami_dest, mode=0755)
+    os.makedirs(ami_dest, mode=0o777)
     open(os.path.join(ami_dest, "ami-1.raw"), "a").close()
 
     j_file = os.path.join(os.path.dirname(__file__), "data/aws_staged/pub-mapfile.json")
@@ -42,7 +42,7 @@ def staged_file():
     temp_stage = "/tmp/test_staged"
     if os.path.exists(temp_stage):
         shutil.rmtree(temp_stage)
-    os.makedirs(os.path.join(temp_stage, "test_x86_64/FILES"), mode=0755)
+    os.makedirs(os.path.join(temp_stage, "test_x86_64/FILES"), mode=0o777)
     open(os.path.join(temp_stage, "test_x86_64/FILES/test.txt"), "a").close()
     with open(os.path.join(temp_stage, "staged.yml"), "w") as out_file:
         yaml.dump(staged_yaml, out_file)
@@ -94,6 +94,7 @@ def test_do_push(command_tester, requests_mocker):
             "--aws-secret-key",
             "secret_key",
             "--ship",
+            "--debug",
         ],
     )
 
@@ -255,6 +256,40 @@ def test_not_ami_push_item(command_tester, staged_file):
             "access_id",
             "--aws-secret-key",
             "secret_key",
+            "--debug",
+        ],
+    )
+
+
+def test_aws_publish_failures(command_tester, mock_aws_publish):
+    response = mock_aws_publish.return_value
+    mock_aws_publish.side_effect = [
+        Exception("Unable to publish"),
+        response,
+        Exception("Unable to publish"),
+        response,
+        response,
+    ]
+    command_tester.test(
+        lambda: entry_point(AmiPush),
+        [
+            "test-push",
+            "--source",
+            AMI_STAGE_ROOT,
+            "--rhsm-url",
+            "https://example.com",
+            "--aws-provider-name",
+            "awstest",
+            "--retry-wait",
+            "1",
+            "--accounts",
+            "123, 456",
+            "--aws-access-id",
+            "access_id",
+            "--aws-secret-key",
+            "secret_key",
+            "--ship",
+            "--allow-public-image",
             "--debug",
         ],
     )

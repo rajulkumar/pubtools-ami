@@ -3,9 +3,10 @@ import sys
 import os
 import time
 import datetime
-import attr
 import json
+import attr
 
+from requests import HTTPError
 from more_executors import Executors
 from cloudimg.aws import AWSPublishingMetadata
 from pushsource import Source, AmiPushItem
@@ -19,7 +20,9 @@ LOG = logging.getLogger("pubtools.ami")
 class MissingProductError(Exception):
     """Exception class for products missing in the metadata service"""
 
-    pass
+
+class AWSPublishError(Exception):
+    """Exception class for AWS publish errors"""
 
 
 class AmiPush(AmiTask, RHSMClientService, AWSPublishService, CollectorService):
@@ -88,7 +91,11 @@ class AmiPush(AmiTask, RHSMClientService, AWSPublishService, CollectorService):
         if image_type == "HOURLY":
             product = product + "_" + image_type
 
-        LOG.debug("Searching for product %s in rhsm", product)
+        LOG.debug(
+            "Searching for product %s for provider %s in rhsm",
+            product,
+            aws_provider_name,
+        )
         for rhsm_product in self.rhsm_products:
             if (
                 rhsm_product["name"] == product
@@ -117,7 +124,6 @@ class AmiPush(AmiTask, RHSMClientService, AWSPublishService, CollectorService):
         """
         verified = True
         for item in self.ami_push_items:
-            LOG.debug("Verifying push item: %s", item)
             if not self.in_rhsm(item.release.product, item.type):
                 LOG.error(
                     "Pre-push check in metadata service failed for %s at %s",
@@ -221,7 +227,10 @@ class AmiPush(AmiTask, RHSMClientService, AWSPublishService, CollectorService):
         )
 
         aws = self.aws_service(region)
-        image = aws.publish(publish_meta)
+        try:
+            image = aws.publish(publish_meta)
+        except Exception as exc:
+            raise AWSPublishError(exc)
 
         if ship:
             self.update_rhsm_metadata(image, push_item)
@@ -234,7 +243,10 @@ class AmiPush(AmiTask, RHSMClientService, AWSPublishService, CollectorService):
                 # http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/sharingamis-intro.html
                 publish_meta.groups = ["all"]
                 # A repeat call to publish will only update the groups
-                aws.publish(publish_meta)
+                try:
+                    aws.publish(publish_meta)
+                except Exception as exc:
+                    raise AWSPublishError(exc)
 
         LOG.info("Successfully uploaded %s [%s] [%s]", name, region, image.id)
 
@@ -299,7 +311,7 @@ class AmiPush(AmiTask, RHSMClientService, AWSPublishService, CollectorService):
         """
         region_data = {}
         for item in self.ami_push_items:
-            for dest in item.dest:
+            for _ in item.dest:
                 region = item.region
                 region_data.setdefault((item, region), []).append({"push_item": item})
         return region_data.values()
@@ -319,7 +331,7 @@ class AmiPush(AmiTask, RHSMClientService, AWSPublishService, CollectorService):
                 try:
                     image_id, image_name = self.upload(push_item)
                     state = "PUSHED"
-                except Exception as exc:
+                except (HTTPError, AWSPublishError) as exc:
                     LOG.warning(str(exc))
                     if retries > 0:
                         retries -= 1
@@ -348,7 +360,7 @@ class AmiPush(AmiTask, RHSMClientService, AWSPublishService, CollectorService):
             result["push_item"] = attr.asdict(result["push_item"])
 
         metadata = json.dumps(results, default=convert, indent=2, sort_keys=True)
-        self.collector.attach_file("images.json", metadata).result()
+        return self.collector.attach_file("images.json", metadata).result()
 
     def add_args(self):
         super(AmiPush, self).add_args()
