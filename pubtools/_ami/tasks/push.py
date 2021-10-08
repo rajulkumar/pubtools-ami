@@ -360,10 +360,11 @@ class AmiPush(AmiTask, RHSMClientService, AWSPublishService):
         # update rhsm
         # verify result
         #self.verify_result()
-        LOG.info("printing itemss")
-        for data in result:
-            LOG.info(data)
+        LOG.info("Collecting results")
+        #for data in result:
+        #    LOG.info(data)
         self.collect_push_status(region_data)
+        LOG.info("AMI upload completed")
 
 
 
