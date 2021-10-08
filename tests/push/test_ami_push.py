@@ -29,6 +29,7 @@ def test_do_push(command_tester, requests_mocker, mock_aws_publish, caplog):
     mock_aws_publish.return_value = publish_rv
     aws_staged = os.path.join(os.path.dirname(__file__), "data/aws_staged")
 
+
     command_tester.test(
         lambda: entry_point(AmiPush),
         [
@@ -45,7 +46,6 @@ def test_do_push(command_tester, requests_mocker, mock_aws_publish, caplog):
             "access_id",
             "--aws-secret-key",
             "secret_key",
-            "--debug",
             "--ship"
 
         ]
